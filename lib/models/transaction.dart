@@ -1,5 +1,3 @@
-import 'package:flutter/cupertino.dart';
-
 import 'package:flutter/foundation.dart'; // por causa do @required
 
 class Transaction {
