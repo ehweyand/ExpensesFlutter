@@ -10,13 +10,6 @@ import './widgets/new_transaction.dart';
 import './widgets/chart.dart';
 
 void main() {
-  //Permitir apenas modo retrato e outras configurações gerais do app
-  /*WidgetsFlutterBinding
-      .ensureInitialized(); //necessário para utilizar o SystemChrome
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);*/
   runApp(MyApp());
 }
 
@@ -73,15 +66,13 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _showChart = false;
 
   List<Transaction> get _recentTransactions {
-    //apenas as transações mais recentes...
     return _userTransactions.where((tx) {
-      //se aconteceu na última semana
       return tx.date.isAfter(
         DateTime.now().subtract(
           Duration(days: 7),
         ),
-      ); //roda uma função em cada elemento da lista, se retornar true é incluida na lista e se não, não é incluída
-    }).toList(); // precisa transformar em list pois o where retorna um Iterable
+      );
+    }).toList();
   }
 
   void _addNewTransaction(String title, double amount, DateTime chosenDate) {
@@ -92,8 +83,6 @@ class _MyHomePageState extends State<MyHomePage> {
       id: DateTime.now().toString(),
     );
 
-    //Provoca o rebuild dos elementos que foram alterados ou novos adicionados
-    //No caso, irá rebuildar o stateless widget de transaction list, para exibir a nova transacao adicionada
     setState(() {
       _userTransactions.add(newTx);
     });
@@ -102,7 +91,6 @@ class _MyHomePageState extends State<MyHomePage> {
   void _startAddNewTransaction(BuildContext ctx) {
     showModalBottomSheet(
       context: ctx,
-      //Novamente (_) por saber que irá receber um parâmetro, mas não irá utilizar
       builder: (_) {
         return GestureDetector(
           onTap: () {},
@@ -120,17 +108,64 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    //Pega os valores atuais do MediaQuery
-    final mediaQuery = MediaQuery.of(context);
-    final isLandscape = mediaQuery.orientation == Orientation.landscape;
-    //define a tipagem pois ambas as possibilidades de appBar são desse tipo de widget (objeto)
-    final PreferredSizeWidget appBar = Platform.isIOS
+  List<Widget> _buildLandscapeContent(
+    MediaQueryData mediaQuery,
+    AppBar appBar,
+    Widget txListWidget,
+  ) {
+    return [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Text(
+            'Show Chart',
+            style: Theme.of(context).textTheme.title,
+          ),
+          Switch.adaptive(
+            activeColor: Theme.of(context).accentColor,
+            value: _showChart,
+            onChanged: (val) {
+              setState(() {
+                _showChart = val;
+              });
+            },
+          ),
+        ],
+      ),
+      _showChart
+          ? Container(
+              height: (mediaQuery.size.height -
+                      appBar.preferredSize.height -
+                      mediaQuery.padding.top) *
+                  0.7,
+              child: Chart(_recentTransactions),
+            )
+          : txListWidget
+    ];
+  }
+
+  List<Widget> _buildPortraitContent(
+    MediaQueryData mediaQuery,
+    AppBar appBar,
+    Widget txListWidget,
+  ) {
+    return [
+      Container(
+        height: (mediaQuery.size.height -
+                appBar.preferredSize.height -
+                mediaQuery.padding.top) *
+            0.3,
+        child: Chart(_recentTransactions),
+      ),
+      txListWidget
+    ];
+  }
+
+  Widget _buildAppBar() {
+    return Platform.isIOS
         ? CupertinoNavigationBar(
             middle: Text('Personal Expenses'),
             trailing: Row(
-              //por padrão a row usa todo espaço que conseguir
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 GestureDetector(
@@ -149,6 +184,13 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ],
           );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+    final PreferredSizeWidget appBar = _buildAppBar();
 
     final txListWidget = Container(
       height: (mediaQuery.size.height -
@@ -158,59 +200,28 @@ class _MyHomePageState extends State<MyHomePage> {
       child: TransactionList(_userTransactions, _deleteTransaction),
     );
 
-    //SafeArea é um widget auxiliar que evita interferência do sistema, fica nos limites disponíveis do Sistema operacional
     final pageBody = SafeArea(
       child: SingleChildScrollView(
         child: Column(
-          //mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          //Calculando height dinamicamente - size.width traz a informação de tamanho do device
-          //40% e 60% do tamanho da tela. Mas, precisa reduzir os tamanhos fixos (appBar e statusbar (pega pelo padding padrão adicionado pelo flutter))
           children: <Widget>[
             if (isLandscape)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Text(
-                    'Show Chart',
-                    style: Theme.of(context).textTheme.title,
-                  ),
-                  //adaptive para pegar a aparência da plataforma (iOS , Android)
-                  Switch.adaptive(
-                    activeColor: Theme.of(context).accentColor,
-                    value: _showChart,
-                    onChanged: (val) {
-                      setState(() {
-                        _showChart = val;
-                      });
-                    },
-                  ),
-                ],
+              ..._buildLandscapeContent(
+                mediaQuery,
+                appBar,
+                txListWidget,
               ),
             if (!isLandscape)
-              Container(
-                height: (mediaQuery.size.height -
-                        appBar.preferredSize.height -
-                        mediaQuery.padding.top) *
-                    0.3,
-                child: Chart(_recentTransactions),
+              //operador ... : quero tirar todos os elementos da lista e espalhar eles em elementos individuais.
+              ..._buildPortraitContent(
+                mediaQuery,
+                appBar,
+                txListWidget,
               ),
-            if (!isLandscape) txListWidget,
-            if (isLandscape)
-              _showChart //aqui vai ver se o switch do gráfico tá ligado e só mostra ele no landscape
-                  ? Container(
-                      height: (mediaQuery.size.height -
-                              appBar.preferredSize.height -
-                              mediaQuery.padding.top) *
-                          0.7,
-                      child: Chart(_recentTransactions),
-                    )
-                  : txListWidget
           ],
         ),
       ),
     );
-    //Verificar qual Scaffold básico usar de acordo com a plataforma
     return Platform.isIOS
         ? CupertinoPageScaffold(
             child: pageBody,
@@ -222,7 +233,7 @@ class _MyHomePageState extends State<MyHomePage> {
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.centerFloat,
             floatingActionButton: Platform.isIOS
-                ? Container() //container para quando estiver no iOS, não renderizar nada
+                ? Container()
                 : FloatingActionButton(
                     child: Icon(Icons.add),
                     onPressed: () => _startAddNewTransaction(context),
